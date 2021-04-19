@@ -1,9 +1,7 @@
 ---
-title: ""
+title: "Map View"
 output: html_document
 ---
-
-</br>
 
 ```{css, echo = FALSE}
 html *
