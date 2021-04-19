@@ -1,7 +1,9 @@
 ---
-title: "FORA Property Audit"
+title: ""
 output: html_document
 ---
+
+</br>
 
 ```{css, echo = FALSE}
 html *
@@ -71,14 +73,14 @@ fora <- merge(fora[fora$parcel_id %in% wants$COE, ], wants, by.x = "parcel_id", 
 
 ```{r, echo = FALSE, fig.align='center'}
 fora[["color"]] <- ifelse(fora[["Match.Owner"]] == "FORT ORD REUSE AUTHORITY", "red", "blue")
-fora[["color"]] <- ifelse(fora[["Match.Owner"]] == "TBD", "yellow", fora[["color"]])
-fora[["color"]] <- ifelse(fora[["Match.Owner"]] == "", "transparent", fora[["color"]])
+fora[["color"]] <- ifelse(fora[["Match.Owner"]] == "", "yellow", fora[["color"]])
+fora[["color"]] <- ifelse(fora[["Match.Owner"]] == "" & fora[["Note"]] == "Road", "white", fora[["color"]])
 # Map ==========================================================================
 leaflet() %>%
   addProviderTiles(provider = providers[['Esri.WorldGrayCanvas']],
                    group    = "Imagery") %>%
-  setView(lng = -121.798, lat = 36.625,
-            zoom = 12.5) %>%
+  setView(lng = -121.775, lat = 36.63,
+            zoom = 12.3) %>%
   addMeasure(position          = "topright",
              primaryLengthUnit = "feet", 
              primaryAreaUnit   = "acres") %>%
@@ -87,12 +89,23 @@ leaflet() %>%
               label = "Former Fort Ord Boundary") %>%
   addPolygons(data = fora, fill = TRUE, color = "black", label = ~parcel_id,
               fillColor = fora[["color"]],
-              popup = paste0("<table>",
+              popup = case_when(fora[["Match.Owner"]] == "" & fora[["Note"]] == "Road" ~ paste0("<table>",
+                                                                                                "<tr><th>COE: </th><td>", fora[["parcel_id"]], "</td></tr>",
+                                                                                                "<tr><th>Note: </th><td>No APN on record for this parcel.</td></tr></table>"),
+                                fora[["Match.Owner"]] == "" ~ paste0("<table>",
+                                                                     "<tr><th>COE: </th><td>", fora[["parcel_id"]], "</td></tr>",
+                                                                     "<tr><th>APN: </th><td>", fora[["Match.APN"]], "</td></tr>",
+                                                                     "<tr><th>Note: </th><td>No ownership data found for this parcel. </td></tr></table>"),
+                             fora[["Match.Owner"]] != "" ~ paste0("<table>",
                             "<tr><th>COE: </th><td>", fora[["parcel_id"]], "</td>",
                             "<tr><th>APN: </th><td>", fora[["Match.APN"]], "</td>",
                             "<tr><th>Owner: </th><td>", fora[["Match.Owner"]], "</td>",
                             "<tr><th>Deed: </th><td>", fora[["Match.Deed"]], "</td>",
-                            "</table>"),
-              opacity = 1, weight = 1, fillOpacity = 0.5) 
+                            "</table>")),
+              opacity = 1, weight = 1, fillOpacity = 0.5) %>%
+  addLegend(color = c("white", "red", "yellow", "blue"),
+            labels = c("No APN", "FORA Owned", "Records pending", "Transfer complete"),
+            opacity = 1, position = "bottomright",
+            title = "Parcel Status")
 ```
 

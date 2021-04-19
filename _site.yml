@@ -1,8 +1,8 @@
 name: "ESCA Signage Committee Proposed Locations"
 output_dir: "docs"
 navbar:
-  title: ""
-  left:
+  title: "FORA Property Transfer Audit"
+  right:
     - text: "Map"
       href: index.html
     - text: "Table"
