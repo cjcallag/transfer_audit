@@ -70,8 +70,9 @@ fora <- merge(fora[fora$parcel_id %in% wants$COE, ], wants, by.x = "parcel_id", 
 ```
 
 ```{r, echo = FALSE, fig.align='center'}
-fora[["color"]] <- ifelse(fora[["Owner"]] == "FORA", "red", "blue")
-fora[["color"]] <- ifelse(fora[["Owner"]] == "TBD", "yellow", fora[["color"]])
+fora[["color"]] <- ifelse(fora[["Match.Owner"]] == "FORT ORD REUSE AUTHORITY", "red", "blue")
+fora[["color"]] <- ifelse(fora[["Match.Owner"]] == "TBD", "yellow", fora[["color"]])
+fora[["color"]] <- ifelse(fora[["Match.Owner"]] == "", "transparent", fora[["color"]])
 # Map ==========================================================================
 leaflet() %>%
   addProviderTiles(provider = providers[['Esri.WorldGrayCanvas']],
@@ -84,13 +85,13 @@ leaflet() %>%
   addPolygons(data = fo, fill = FALSE, weight = 2, color = "grey",
               opacity = 1, dashArray = 4, 
               label = "Former Fort Ord Boundary") %>%
-  addPolygons(data = fora, fill = TRUE, color = "#FFFFFF", label = ~parcel_id,
+  addPolygons(data = fora, fill = TRUE, color = "black", label = ~parcel_id,
               fillColor = fora[["color"]],
               popup = paste0("<table>",
                             "<tr><th>COE: </th><td>", fora[["parcel_id"]], "</td>",
-                            "<tr><th>APN: </th><td>", fora[["APN"]], "</td>",
-                            "<tr><th>Owner: </th><td>", fora[["Owner"]], "</td>",
-                            "<tr><th>Deed: </th><td>", fora[["Deed.."]], "</td>",
+                            "<tr><th>APN: </th><td>", fora[["Match.APN"]], "</td>",
+                            "<tr><th>Owner: </th><td>", fora[["Match.Owner"]], "</td>",
+                            "<tr><th>Deed: </th><td>", fora[["Match.Deed"]], "</td>",
                             "</table>"),
               opacity = 1, weight = 1, fillOpacity = 0.5) 
 ```

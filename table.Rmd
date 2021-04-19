@@ -31,7 +31,7 @@ fora <- merge(fora[fora$parcel_id %in% wants$COE, ], wants, by.x = "parcel_id", 
 
 ```{r}
 fora %>% 
-  select(COE = parcel_id, APN, Owner, Deed = Deed.., `Army Transfer Doc` = Transfer.Doc.Name, Jurisdiction) %>%
+  select(COE = parcel_id, APN = Match.APN, Owner = Match.Owner, Deed = Match.Deed, `Army Transfer Doc` = Transfer.Doc.Name, Jurisdiction) %>%
   `st_geometry<-`(NULL) %>%
   DT::datatable(escape = FALSE, rownames = FALSE,
                 # caption = htmltools::tags$caption(style = "text-align: center; color: #808080",
