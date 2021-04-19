@@ -25,8 +25,7 @@ library(sf)
 wants <- read.csv("data.csv")
 api_url <- "https://maps.fodis.net/server/rest/services/OpenData/AdministrativeBoundaries/FeatureServer/1/query?where=1%3D1&outFields=*&outSR=4326&f=json"
 fora <- sf::st_read(api_url) 
-fora <- merge(fora[fora$parcel_id %in% wants$COE, ], wants, by.x = "parcel_id", by.y = "COE") %>%
-  distinct(parcel_id, .keep_all = TRUE)
+fora <- merge(fora[fora$parcel_id %in% wants$COE, ], wants, by.x = "parcel_id", by.y = "COE")
 ```
 
 ```{r}

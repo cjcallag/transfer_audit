@@ -58,21 +58,57 @@ tr:hover {background-color: #f5f5f5;}
 knitr::opts_chunk$set(echo = FALSE)
 library(dplyr)
 library(leaflet)
+library(tidyr)
 library(sf)
 # Get data =====================================================================
 fo <- sf::st_read("https://maps.fodis.net/server/rest/services/OpenData/AdministrativeBoundaries/FeatureServer/4/query?where=1%3D1&outFields=*&outSR=4326&f=json")
+
 wants <- read.csv("data.csv")
+
 api_url <- "https://maps.fodis.net/server/rest/services/OpenData/AdministrativeBoundaries/FeatureServer/1/query?where=1%3D1&outFields=*&outSR=4326&f=json"
 
-fora <- sf::st_read(api_url) 
-fora <- merge(fora[fora$parcel_id %in% wants$COE, ], wants, by.x = "parcel_id", by.y = "COE") %>%
-  distinct(parcel_id, .keep_all = TRUE)
+fora <- sf::st_read(api_url) %>% 
+  filter(parcel_id %in% wants[["COE"]]) %>%
+  merge(., wants, by.x = "parcel_id", by.y = "COE") %>%
+  select(COE = parcel_id, APN = Match.APN, Owner = Match.Owner, Deed = Match.Deed, Note) %>%
+  group_by(COE) %>%
+  group_nest() %>%
+  ungroup()
+
+unnested_row <- function(.df, .id, .var) {
+  sapply(.df[[.id]], function(x) {
+    paste0("<tr><th><b>", .var, ": </b></th><td>",
+           paste0(.df[.df[[.id]]==x, "data"][[1]][[1]][[.var]], collapse = "</td><td>"),
+           "</td></tr>")
+    })
+}
+
+detect_string <- function(.df, .id, .var, .string) {
+  sapply(.df[[.id]], function(x) {
+    temp <- .df[.df[[.id]] == x, "data"][[1]][[1]][[.var]]
+    .string %in% temp
+  })
+}
+
+get_geometry <- function(.df, .id) {
+  lapply(.df[[.id]], function(x) {
+    temp <- .df[.df[[.id]] == x, "data"][[1]][[1]][['geometry']]
+    temp[[1]]
+    })
+}
+
+fora[["Owner_Row"]] <- unnested_row(fora, "COE", "Owner")
+fora[["APN_Row"]] <- unnested_row(fora, "COE", "APN")
+fora[["Deed_Row"]] <- unnested_row(fora, "COE", "Deed")
+fora[["geometry"]] <- get_geometry(fora, "COE")
+fora <- st_as_sf(fora)
 ```
 
 ```{r, echo = FALSE, fig.align='center'}
-fora[["color"]] <- ifelse(fora[["Match.Owner"]] == "FORT ORD REUSE AUTHORITY", "red", "blue")
-fora[["color"]] <- ifelse(fora[["Match.Owner"]] == "", "yellow", fora[["color"]])
-fora[["color"]] <- ifelse(fora[["Match.Owner"]] == "" & fora[["Note"]] == "Road", "white", fora[["color"]])
+fora[["color"]] <- ifelse(detect_string(fora, "COE", "Owner", "FORT ORD REUSE AUTHORITY"), "red", "blue")
+fora[["color"]] <- ifelse(detect_string(fora, "COE", "Owner", "") & !detect_string(fora, "COE", "Owner", "FORT ORD REUSE AUTHORITY"), "yellow", fora[["color"]])
+fora[["color"]] <- ifelse(detect_string(fora, "COE", "Note", "Road"), "white", fora[["color"]])
+names(fora$color) <- NULL
 # Map ==========================================================================
 leaflet() %>%
   addProviderTiles(provider = providers[['Esri.WorldGrayCanvas']],
@@ -85,22 +121,33 @@ leaflet() %>%
   addPolygons(data = fo, fill = FALSE, weight = 2, color = "grey",
               opacity = 1, dashArray = 4, 
               label = "Former Fort Ord Boundary") %>%
-  addPolygons(data = fora, fill = TRUE, color = "black", label = ~parcel_id,
-              fillColor = fora[["color"]],
-              popup = case_when(fora[["Match.Owner"]] == "" & fora[["Note"]] == "Road" ~ paste0("<table>",
-                                                                                                "<tr><th>COE: </th><td>", fora[["parcel_id"]], "</td></tr>",
-                                                                                                "<tr><th>Note: </th><td>No APN on record for this parcel.</td></tr></table>"),
-                                fora[["Match.Owner"]] == "" ~ paste0("<table>",
-                                                                     "<tr><th>COE: </th><td>", fora[["parcel_id"]], "</td></tr>",
-                                                                     "<tr><th>APN: </th><td>", fora[["Match.APN"]], "</td></tr>",
-                                                                     "<tr><th>Note: </th><td>No ownership data found for this parcel. </td></tr></table>"),
-                             fora[["Match.Owner"]] != "" ~ paste0("<table>",
-                            "<tr><th>COE: </th><td>", fora[["parcel_id"]], "</td>",
-                            "<tr><th>APN: </th><td>", fora[["Match.APN"]], "</td>",
-                            "<tr><th>Owner: </th><td>", fora[["Match.Owner"]], "</td>",
-                            "<tr><th>Deed: </th><td>", fora[["Match.Deed"]], "</td>",
-                            "</table>")),
-              opacity = 1, weight = 1, fillOpacity = 0.5) %>%
+  addPolygons(data = fora, color = "black", fill = TRUE,
+              label = ~COE,
+              fillColor = ~color, opacity = 1, weight = 1, fillOpacity = 0.5,
+              popup = case_when(
+                # Roads
+                detect_string(fora, "COE", "Note", "Road") ~ paste0(
+                  "<table>",
+                  "<tr><th>COE: </th><td>", fora[["COE"]], "</td></tr>",
+                  "</table><p><b>NOTE: </b>No APN on record for this parcel.</p>"),
+                # Red
+                detect_string(fora, "COE", "Owner", "FORT ORD REUSE AUTHORITY") ~ paste0(
+                  "<p><b>COE: </b>",fora[["COE"]], "</p>",
+                  "<table>",
+                  fora[["APN_Row"]], fora[["Owner_Row"]], fora[["Deed_Row"]],
+                  "</table>"),
+                # BLUE
+                !detect_string(fora, "COE", "Owner", "FORT ORD REUSE AUTHORITY") & !detect_string(fora, "COE", "Note", "Road") & !detect_string(fora, "COE", "Owner", "")   ~ paste0(
+                  "<p><b>COE: </b>",fora[["COE"]], "</p>",
+                  "<table>",
+                  fora[["APN_Row"]], fora[["Owner_Row"]], fora[["Deed_Row"]],
+                  "</table>"),
+                # Yellow
+                !detect_string(fora, "COE", "Note", "Road") & detect_string(fora, "COE", "Owner", "") ~paste0(
+                  "<table>",
+                  "<tr><th>COE: </th><td>", fora[["COE"]], "</td></tr>",
+                  fora[["APN_Row"]],
+                  "</table><p><b>NOTE: </b>There is either no parcel found at this location, or the parcel polygon at this location is temporarily suspended pending modifications in progress by the County Assessor and Parcelquest staff. </p>"))) %>%
   addLegend(color = c("white", "red", "yellow", "blue"),
             labels = c("No APN", "FORA Owned", "Records pending", "Transfer complete"),
             opacity = 1, position = "bottomright",
