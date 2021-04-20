@@ -26,12 +26,24 @@ html *
   line-height: 20px;
 }
 
+.leaflet .leaflet-popup-content {
+  opacity: 0.90;
+  font-size: 10px;
+  line-height: 20px;
+  width:auto !important;
+}
+
 .leaflet .leaflet-control {
   opacity: 0.90;
 }
 
-th, td {
+th {
   padding: 5px;
+  text-align: left;
+}
+
+td {
+  padding: 10px;
   text-align: left;
 }
 
@@ -41,10 +53,6 @@ a:hover {
 }
 
 tr:hover {background-color: #f5f5f5;}
-
-#compacttable th, td{
-  padding: 0.5px;
-}
 
 .center {
   display: block;
@@ -109,8 +117,8 @@ get_geometry <- function(.df, .id) {
 }
 # Create html table rows by value ----------------------------------------------
 fora[["Owner_Row"]] <- unnested_row(fora, "COE", "Owner")
-fora[["APN_Row"]] <- unnested_row(fora, "COE", "APN")
-fora[["Deed_Row"]] <- unnested_row(fora, "COE", "Deed")
+fora[["APN_Row"]]   <- unnested_row(fora, "COE", "APN")
+fora[["Deed_Row"]]  <- unnested_row(fora, "COE", "Deed")
 # Pull out geometry from nested list and make it a geometry --------------------
 fora[["geometry"]] <- get_geometry(fora, "COE")
 fora <- st_as_sf(fora)
