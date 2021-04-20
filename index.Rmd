@@ -54,19 +54,20 @@ tr:hover {background-color: #f5f5f5;}
 }
 ```
 
-```{r setup, include=FALSE}
+```{r setup, include = FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 library(dplyr)
 library(leaflet)
+library(leaflet.extras)
 library(tidyr)
 library(sf)
-# Get data =====================================================================
+# Get data ---------------------------------------------------------------------
+## Fort Ord Boundaries
 fo <- sf::st_read("https://maps.fodis.net/server/rest/services/OpenData/AdministrativeBoundaries/FeatureServer/4/query?where=1%3D1&outFields=*&outSR=4326&f=json")
-
+## Import our hand filled data
 wants <- read.csv("data.csv")
-
+## Get simple features, filter them, and nest them
 api_url <- "https://maps.fodis.net/server/rest/services/OpenData/AdministrativeBoundaries/FeatureServer/1/query?where=1%3D1&outFields=*&outSR=4326&f=json"
-
 fora <- sf::st_read(api_url) %>% 
   filter(parcel_id %in% wants[["COE"]]) %>%
   merge(., wants, by.x = "parcel_id", by.y = "COE") %>%
@@ -74,55 +75,70 @@ fora <- sf::st_read(api_url) %>%
   group_by(COE) %>%
   group_nest() %>%
   ungroup()
-
+# Declare helper functions -----------------------------------------------------
 unnested_row <- function(.df, .id, .var) {
+  stopifnot(".df should be a data.frame"      = is.data.frame(.df),
+            ".id should be a character"       = is.character(.id),
+            ".var should be a character"      = is.character(.var),
+            ".id not variable in data.frame"  = .id %in% names(.df))
   sapply(.df[[.id]], function(x) {
     paste0("<tr><th><b>", .var, ": </b></th><td>",
            paste0(.df[.df[[.id]]==x, "data"][[1]][[1]][[.var]], collapse = "</td><td>"),
            "</td></tr>")
     })
 }
-
 detect_string <- function(.df, .id, .var, .string) {
+  stopifnot(".df should be a data.frame"      = is.data.frame(.df),
+            ".id should be a character"       = is.character(.id),
+            ".var should be a character"      = is.character(.var),
+            ".string should be a character"   = is.character(.string),
+            ".id not variable in data.frame"  = .id %in% names(.df))
   sapply(.df[[.id]], function(x) {
     temp <- .df[.df[[.id]] == x, "data"][[1]][[1]][[.var]]
     .string %in% temp
   })
 }
-
 get_geometry <- function(.df, .id) {
+  stopifnot(".df should be a data.frame"    = is.data.frame(.df),
+            ".id should be a character"     = is.character(.id),
+            ".id not variable in character" = .id %in% names(.df))
   lapply(.df[[.id]], function(x) {
     temp <- .df[.df[[.id]] == x, "data"][[1]][[1]][['geometry']]
     temp[[1]]
     })
 }
-
+# Create html table rows by value ----------------------------------------------
 fora[["Owner_Row"]] <- unnested_row(fora, "COE", "Owner")
 fora[["APN_Row"]] <- unnested_row(fora, "COE", "APN")
 fora[["Deed_Row"]] <- unnested_row(fora, "COE", "Deed")
+# Pull out geometry from nested list and make it a geometry --------------------
 fora[["geometry"]] <- get_geometry(fora, "COE")
 fora <- st_as_sf(fora)
+# Color ------------------------------------------------------------------------
+fora[["color"]] <- if_else(
+  detect_string(fora, "COE", "Owner", "FORT ORD REUSE AUTHORITY"),
+  true = "red", false = "blue")
+fora[["color"]] <- if_else(
+  detect_string(fora, "COE", "Owner", "") & !detect_string(fora, "COE", "Owner", "FORT ORD REUSE AUTHORITY"),
+  true = "yellow", false = fora[["color"]])
+fora[["color"]] <- if_else(
+  detect_string(fora, "COE", "Note", "Road"),
+  true = "white", false = fora[["color"]])
+names(fora$color) <- NULL # removed names from the name vector for leaflet
 ```
 
 ```{r, echo = FALSE, fig.align='center'}
-fora[["color"]] <- ifelse(detect_string(fora, "COE", "Owner", "FORT ORD REUSE AUTHORITY"), "red", "blue")
-fora[["color"]] <- ifelse(detect_string(fora, "COE", "Owner", "") & !detect_string(fora, "COE", "Owner", "FORT ORD REUSE AUTHORITY"), "yellow", fora[["color"]])
-fora[["color"]] <- ifelse(detect_string(fora, "COE", "Note", "Road"), "white", fora[["color"]])
-names(fora$color) <- NULL
-# Map ==========================================================================
+# Map --------------------------------------------------------------------------
 leaflet() %>%
   addProviderTiles(provider = providers[['Esri.WorldGrayCanvas']],
                    group    = "Imagery") %>%
   setView(lng = -121.775, lat = 36.63,
             zoom = 12.3) %>%
-  addMeasure(position          = "topright",
-             primaryLengthUnit = "feet", 
-             primaryAreaUnit   = "acres") %>%
   addPolygons(data = fo, fill = FALSE, weight = 2, color = "grey",
               opacity = 1, dashArray = 4, 
               label = "Former Fort Ord Boundary") %>%
   addPolygons(data = fora, color = "black", fill = TRUE,
-              label = ~COE,
+              label = ~COE, group = "searchable",
               fillColor = ~color, opacity = 1, weight = 1, fillOpacity = 0.5,
               popup = case_when(
                 # Roads
@@ -151,6 +167,14 @@ leaflet() %>%
   addLegend(color = c("white", "red", "yellow", "blue"),
             labels = c("No APN", "FORA Owned", "Records pending", "Transfer complete"),
             opacity = 1, position = "bottomright",
-            title = "Parcel Status")
+            title = "Parcel Status") %>%
+  addSearchFeatures(targetGroups = "searchable", 
+                    options      = searchFeaturesOptions(zoom                 = 15,
+                                                         openPopup            = TRUE,
+                                                         moveToLocation       = TRUE,
+                                                         position             = "topright",
+                                                         hideMarkerOnCollapse = TRUE,
+                                                         textPlaceholder      = "Search COE...",
+                                                         autoCollapse         = TRUE))
 ```
 
