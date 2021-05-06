@@ -71,12 +71,13 @@ library(tidyr)
 library(sf)
 # Get data ---------------------------------------------------------------------
 ## Fort Ord Boundaries
-fo <- sf::st_read("https://maps.fodis.net/server/rest/services/OpenData/AdministrativeBoundaries/FeatureServer/4/query?where=1%3D1&outFields=*&outSR=4326&f=json")
+fo <- st_read("https://maps.fodis.net/server/rest/services/OpenData/AdministrativeBoundaries/FeatureServer/4/query?where=1%3D1&outFields=*&outSR=4326&f=json")
 ## Import our hand filled data
-wants <- read.csv("data.csv")
+options(gargle_oauth_email = readLines(".credential/gmail"))
+wants <- read_sheet("https://docs.google.com/spreadsheets/d/106uYNJ-YfZVJtI1ztw2PqKvF8YUzGsyPiHnWec4rV7w/edit#gid=1167995236")
 ## Get simple features, filter them, and nest them
 api_url <- "https://maps.fodis.net/server/rest/services/OpenData/AdministrativeBoundaries/FeatureServer/1/query?where=1%3D1&outFields=*&outSR=4326&f=json"
-fora <- sf::st_read(api_url) %>% 
+fora <- st_read(api_url) %>% 
   filter(parcel_id %in% wants[["COE"]]) %>%
   merge(., wants, by.x = "parcel_id", by.y = "COE") %>%
   select(COE = parcel_id, APN = Match.APN, Owner = Match.Owner, Deed = Match.Deed, Note) %>%

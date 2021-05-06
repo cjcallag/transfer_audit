@@ -21,22 +21,42 @@ html *
 knitr::opts_chunk$set(echo = FALSE)
 library(dplyr)
 library(DT)
+library(googlesheets4)
 library(sf)
-wants <- read.csv("data.csv")
+# Deeds ========================================================================
+deeds <- source("get_uploaded.R")[["value"]]
+options(gargle_oauth_email = readLines(".credential/gmail"))
+wants <- read_sheet("https://docs.google.com/spreadsheets/d/106uYNJ-YfZVJtI1ztw2PqKvF8YUzGsyPiHnWec4rV7w/edit#gid=1167995236")
 api_url <- "https://maps.fodis.net/server/rest/services/OpenData/AdministrativeBoundaries/FeatureServer/1/query?where=1%3D1&outFields=*&outSR=4326&f=json"
 fora <- sf::st_read(api_url) 
-fora <- merge(fora[fora$parcel_id %in% wants$COE, ], wants, by.x = "parcel_id", by.y = "COE")
+fora <- merge(fora[fora$parcel_id %in% wants$COE, ],
+              wants, by.x = "parcel_id", by.y = "COE")
 ```
 
 ```{r}
 fora %>% 
-  select(COE = parcel_id, APN = Match.APN, Owner = Match.Owner, Deed = Match.Deed, `Army Transfer Doc` = Transfer.Doc.Name, Jurisdiction) %>%
-  `st_geometry<-`(NULL) %>%
+  select(COE = parcel_id, APN = `Match APN`, Owner = `Match Owner`, `FORA Out Deed` = `Match Deed`, `FORA In Deed` = `In Deed Number`, Jurisdiction) %>%
+  mutate(`FORA In Deed` = ifelse(`FORA In Deed` %in% names(deeds), 
+                                 paste0("<a href='",
+                                          deeds[`FORA In Deed`],
+                                          "'>", 
+                                          names(deeds[`FORA In Deed`]),
+                                          "</a>"),
+                                 `FORA In Deed`),
+         `FORA Out Deed` = sapply(`FORA Out Deed`, function(x) {ifelse(is.null(x), "", x)}),
+         `FORA Out Deed` = ifelse(`FORA Out Deed` %in% names(deeds),
+                                  paste0("<a href='",
+                                          deeds[`FORA Out Deed`],
+                                          "'>",
+                                          names(deeds[`FORA Out Deed`]),
+                                          "</a>"),
+                                 `FORA Out Deed`)) %>%
+  `st_geometry<-`(NULL) %>% 
   DT::datatable(escape = FALSE, rownames = FALSE,
-                # caption = htmltools::tags$caption(style = "text-align: center; color: #808080",
-                #                                   htmltools::tags$h3("Draft Signs and Locations")),
                 options = list(dom = "ftip",
                                search = list(regex           = TRUE, 
                                              caseInsensitive = TRUE)))
 ```
+
+
 
